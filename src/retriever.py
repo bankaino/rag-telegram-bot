@@ -38,8 +38,17 @@ def _load_index() -> tuple[list[Chunk], np.ndarray]:
     return chunks, embeddings
 
 
-# Загружаем индекс один раз при импорте модуля (кешируется в памяти)
-_chunks, _embeddings = _load_index()
+# Ленивая загрузка: индекс читается при первом вызове search(), не при импорте.
+# Это важно на Railway: ingest.py должен успеть создать index.pkl до первого поиска.
+_chunks: list[Chunk] | None = None
+_embeddings: np.ndarray | None = None
+
+
+def _get_index() -> tuple[list[Chunk], np.ndarray]:
+    global _chunks, _embeddings
+    if _chunks is None:
+        _chunks, _embeddings = _load_index()
+    return _chunks, _embeddings
 
 
 def embed_query(query: str) -> np.ndarray:
@@ -51,10 +60,11 @@ def embed_query(query: str) -> np.ndarray:
 
 def search(query: str, top_k: int = TOP_K) -> list[SearchResult]:
     """Returns top_k most relevant chunks for the query, sorted by score desc."""
+    chunks, embeddings = _get_index()
     query_vec = embed_query(query)
-    scores = _embeddings @ query_vec   # dot product = cosine sim (after normalization)
+    scores = embeddings @ query_vec   # dot product = cosine sim (after normalization)
     top_indices = np.argsort(scores)[::-1][:top_k]
     return [
-        SearchResult(chunk=_chunks[i], score=float(scores[i]))
+        SearchResult(chunk=chunks[i], score=float(scores[i]))
         for i in top_indices
     ]

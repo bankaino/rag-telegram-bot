@@ -2,10 +2,13 @@
 RAG chain: assembles a prompt from retrieved context chunks and calls the LLM.
 """
 
+import logging
 import sys
 from pathlib import Path
 
 from openai import OpenAI
+
+logger = logging.getLogger(__name__)
 
 sys.path.insert(0, str(Path(__file__).parent))
 from config import CHAT_MODEL, OPENAI_API_KEY
@@ -37,6 +40,8 @@ def build_context(results: list[SearchResult]) -> str:
 def answer(question: str) -> str:
     """Retrieves relevant context and generates an answer using the LLM."""
     results = search(question)
+
+    logger.info("Query: %r | top scores: %s", question, [round(r.score, 3) for r in results])
 
     # Если даже лучший чанк ниже порога — вопрос явно не по теме базы знаний
     if not results or results[0].score < RELEVANCE_THRESHOLD:

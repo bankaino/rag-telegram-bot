@@ -13,7 +13,7 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
 sys.path.insert(0, str(Path(__file__).parent))
-from config import TELEGRAM_BOT_TOKEN
+from config import TELEGRAM_BOT_TOKEN, INDEX_PATH
 from handlers import router
 
 logging.basicConfig(
@@ -23,7 +23,17 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def ensure_index() -> None:
+    """Runs ingestion if the index doesn't exist yet (e.g. first deploy on Railway)."""
+    if not INDEX_PATH.exists():
+        logger.info("Index not found — running ingestion pipeline...")
+        import ingest
+        ingest.main()
+        logger.info("Ingestion complete.")
+
+
 async def main() -> None:
+    ensure_index()
     bot = Bot(
         token=TELEGRAM_BOT_TOKEN,
         default=DefaultBotProperties(parse_mode=ParseMode.MARKDOWN),
